@@ -1,7 +1,7 @@
 # Core dependencies
 flask==2.3.3
 youtube-transcript-api==0.6.1
-yt-dlp==2023.9.24
+yt-dlp==2024.7.7
 requests==2.31.0
 python-dotenv==1.0.0
 
