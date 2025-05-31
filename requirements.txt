@@ -1,0 +1,29 @@
+# Core dependencies
+flask==2.3.3
+youtube-transcript-api==0.6.1
+yt-dlp==2023.9.24
+requests==2.31.0
+python-dotenv==1.0.0
+
+# RAG and Vector Storage
+chromadb==0.4.15
+sentence-transformers>=2.3.0
+
+# Text Processing
+langchain==0.0.317
+beautifulsoup4==4.12.2
+lxml==4.9.3
+
+# Data Processing
+numpy==1.24.3
+pandas==2.0.3
+
+# LLM APIs (choose one or both)
+openai>=1.0.0              # Current implementation
+anthropic>=0.25.0          # Recommended upgrade
+langchain-openai==0.0.2    # For langchain integration
+
+# Optional: Performance enhancements
+# redis>=4.0.0             # For caching
+# rank-bm25>=0.2.2         # For hybrid search
+# asyncio-throttle>=1.0.0  # For rate limiting

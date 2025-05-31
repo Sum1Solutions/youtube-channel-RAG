@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Channel RAG</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="ragApp()">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">YouTube Content RAG</h1>
+            <p class="text-xl text-blue-600 font-semibold mb-2">Rapidly Distill Complex Video Discussions</p>
+            <p class="text-gray-600">Transform hours of complex conversations into instantly searchable, AI-queryable knowledge</p>
+            <div class="mt-4 text-sm text-gray-500">
+                <p><strong>Perfect for:</strong> Podcasts • Educational Series • Conference Talks • Interview Archives</p>
+            </div>
+        </div>
+
+        <!-- YouTube URL Input Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <h2 class="text-2xl font-semibold mb-4">1. Enter YouTube URL</h2>
+            <div class="mb-3 text-sm text-gray-600">
+                <p><strong>Supported URL types:</strong></p>
+                <ul class="list-disc list-inside space-y-1">
+                    <li><strong>Single Video:</strong> https://www.youtube.com/watch?v=VIDEO_ID</li>
+                    <li><strong>Playlist:</strong> https://www.youtube.com/playlist?list=PLAYLIST_ID</li>
+                    <li><strong>Channel:</strong> https://www.youtube.com/@ChannelName</li>
+                </ul>
+            </div>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    x-model="youtubeUrl" 
+                    placeholder="Enter any YouTube URL (video, playlist, or channel)"
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                <button 
+                    @click="previewContent()" 
+                    :disabled="previewing || !youtubeUrl"
+                    class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!previewing">Preview Content</span>
+                    <span x-show="previewing">Loading...</span>
+                </button>
+            </div>
+
+            <!-- Content Preview -->
+            <div x-show="contentPreview.show" class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h3 class="text-lg font-semibold mb-3">Content Preview</h3>
+                <div class="space-y-2">
+                    <p><strong>Type:</strong> <span x-text="contentPreview.content_type" class="capitalize"></span></p>
+                    <p><strong>Title:</strong> <span x-text="contentPreview.title"></span></p>
+                    <p><strong>Total Videos Found:</strong> <span x-text="contentPreview.total_videos"></span></p>
+                    <p class="text-sm text-gray-600">
+                        Note: Not all videos may have transcripts available. Videos without transcripts will be skipped.
+                    </p>
+                </div>
+                
+                <!-- Sample videos -->
+                <div x-show="contentPreview.videos && contentPreview.videos.length > 0" class="mt-4">
+                    <p class="font-medium mb-2">Sample Videos:</p>
+                    <ul class="text-sm space-y-1">
+                        <template x-for="video in contentPreview.videos" :key="video.id">
+                            <li class="text-gray-700" x-text="video.title"></li>
+                        </template>
+                    </ul>
+                </div>
+
+                <button 
+                    @click="extractContent()" 
+                    :disabled="loading"
+                    class="mt-4 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                    <span x-show="!loading">Extract Transcripts</span>
+                    <span x-show="loading">Processing...</span>
+                </button>
+            </div>
+            
+            <!-- Progress indicator -->
+            <div x-show="loading" class="mt-4">
+                <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="bg-blue-600 h-2 rounded-full animate-pulse" style="width: 50%"></div>
+                </div>
+                <p class="text-sm text-gray-600 mt-2">This may take a few minutes depending on the number of videos...</p>
+            </div>
+
+            <!-- Status display -->
+            <div x-show="status.message" class="mt-4 p-4 rounded-lg" :class="status.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'">
+                <p x-text="status.message"></p>
+                <div x-show="status.success && contentInfo.title" class="mt-2">
+                    <p><strong>Type:</strong> <span x-text="contentInfo.content_type" class="capitalize"></span></p>
+                    <p><strong>Title:</strong> <span x-text="contentInfo.title"></span></p>
+                    <p><strong>Total videos found:</strong> <span x-text="contentInfo.total_videos"></span></p>
+                    <p><strong>Videos with transcripts:</strong> <span x-text="contentInfo.video_count"></span></p>
+                    <p class="text-sm text-gray-600 mt-2" x-show="contentInfo.total_videos > contentInfo.video_count">
+                        <span x-text="contentInfo.total_videos - contentInfo.video_count"></span> videos were skipped (no transcripts available)
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Section -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8" x-show="hasData">
+            <h2 class="text-2xl font-semibold mb-4">2. Search Transcripts</h2>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    x-model="searchQuery" 
+                    placeholder="Search through video transcripts..."
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    @keyup.enter="search()"
+                >
+                <button 
+                    @click="search()" 
+                    :disabled="!searchQuery || searching"
+                    class="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400"
+                >
+                    <span x-show="!searching">Search</span>
+                    <span x-show="searching">Searching...</span>
+                </button>
+            </div>
+
+            <!-- Search Results -->
+            <div x-show="searchResults.length > 0" class="mt-6">
+                <h3 class="text-lg font-semibold mb-3">Search Results:</h3>
+                <div class="space-y-4">
+                    <template x-for="result in searchResults" :key="result.metadata.video_id + '_' + result.metadata.chunk_index">
+                        <div class="border border-gray-200 rounded-lg p-4">
+                            <div class="flex items-start justify-between mb-2">
+                                <h4 class="font-medium text-blue-600">
+                                    <a :href="result.metadata.url" target="_blank" class="hover:underline" x-text="result.metadata.title"></a>
+                                </h4>
+                                <span class="text-sm text-gray-500" x-text="'Score: ' + result.similarity_score.toFixed(3)"></span>
+                            </div>
+                            <p class="text-gray-700 text-sm leading-relaxed" x-text="result.text"></p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="bg-white rounded-lg shadow-md p-6" x-show="hasData">
+            <h2 class="text-2xl font-semibold mb-4">3. Ask Questions</h2>
+            <div class="flex gap-4">
+                <input 
+                    type="text" 
+                    x-model="chatQuestion" 
+                    placeholder="Ask a question about the video content..."
+                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    @keyup.enter="askQuestion()"
+                >
+                <button 
+                    @click="askQuestion()" 
+                    :disabled="!chatQuestion || generating"
+                    class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400"
+                >
+                    <span x-show="!generating">Ask</span>
+                    <span x-show="generating">Thinking...</span>
+                </button>
+            </div>
+
+            <!-- Chat Answer -->
+            <div x-show="chatAnswer" class="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h3 class="font-semibold mb-2">Answer:</h3>
+                <p class="text-gray-700 whitespace-pre-wrap" x-text="chatAnswer"></p>
+            </div>
+        </div>
+
+        <!-- Example URLs -->
+        <div class="mt-8 text-center text-gray-600">
+            <p class="mb-2"><strong>Perfect for Complex Discussion Content:</strong></p>
+            <div class="space-y-2 text-sm">
+                <div class="bg-blue-50 p-3 rounded-lg">
+                    <p><strong>📚 Educational Channel:</strong> <code class="bg-white px-2 py-1 rounded">https://www.youtube.com/@3Blue1Brown</code></p>
+                    <p class="text-xs text-gray-500 mt-1">Mathematics concepts explained across multiple videos</p>
+                </div>
+                <div class="bg-green-50 p-3 rounded-lg">
+                    <p><strong>🎯 Technical Discussion:</strong> <code class="bg-white px-2 py-1 rounded">https://www.youtube.com/watch?v=3NjQ9b3pgIg</code></p>
+                    <p class="text-xs text-gray-500 mt-1">In-depth cybersecurity topic with detailed explanations</p>
+                </div>
+                <div class="bg-purple-50 p-3 rounded-lg">
+                    <p><strong>📖 Course Series:</strong> <code class="bg-white px-2 py-1 rounded">https://www.youtube.com/playlist?list=PLZHQObOWTQDPD3MizzM2xVFitgF8hE_ab</code></p>
+                    <p class="text-xs text-gray-500 mt-1">Linear algebra course with interconnected concepts</p>
+                </div>
+            </div>
+            <p class="text-sm mt-4 font-medium">
+                💡 <strong>After processing:</strong> Ask complex questions like "How do these concepts build on each other?" or "What are the key arguments presented?"
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function ragApp() {
+            return {
+                youtubeUrl: '',
+                searchQuery: '',
+                chatQuestion: '',
+                loading: false,
+                previewing: false,
+                searching: false,
+                generating: false,
+                hasData: false,
+                status: { message: '', success: false },
+                contentInfo: {},
+                contentPreview: { show: false, content_type: '', title: '', total_videos: 0, videos: [] },
+                searchResults: [],
+                chatAnswer: '',
+
+                async previewContent() {
+                    this.previewing = true;
+                    this.contentPreview.show = false;
+                    this.status = { message: '', success: false };
+                    
+                    try {
+                        const response = await fetch('/preview_content', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ url: this.youtubeUrl })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.contentPreview = {
+                                show: true,
+                                content_type: data.content_type,
+                                title: data.title,
+                                total_videos: data.total_videos,
+                                videos: data.videos
+                            };
+                        } else {
+                            this.status = { message: data.error || 'Failed to preview content', success: false };
+                        }
+                    } catch (error) {
+                        this.status = { message: 'Network error: ' + error.message, success: false };
+                    } finally {
+                        this.previewing = false;
+                    }
+                },
+
+                async extractContent() {
+                    this.loading = true;
+                    this.status = { message: '', success: false };
+                    
+                    try {
+                        const response = await fetch('/extract_content', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ url: this.youtubeUrl })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.status = { message: data.message, success: true };
+                            this.contentInfo = {
+                                content_type: data.content_type,
+                                title: data.title,
+                                video_count: data.video_count,
+                                total_videos: data.total_videos,
+                                successful_transcripts: data.successful_transcripts
+                            };
+                            this.hasData = true;
+                        } else {
+                            this.status = { message: data.error || 'Failed to extract content', success: false };
+                        }
+                    } catch (error) {
+                        this.status = { message: 'Network error: ' + error.message, success: false };
+                    } finally {
+                        this.loading = false;
+                    }
+                },
+
+                async search() {
+                    this.searching = true;
+                    this.searchResults = [];
+                    
+                    try {
+                        const response = await fetch('/search', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ query: this.searchQuery })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.searchResults = data.results;
+                        } else {
+                            alert('Search failed: ' + (data.error || 'Unknown error'));
+                        }
+                    } catch (error) {
+                        alert('Network error: ' + error.message);
+                    } finally {
+                        this.searching = false;
+                    }
+                },
+
+                async askQuestion() {
+                    this.generating = true;
+                    this.chatAnswer = '';
+                    
+                    try {
+                        const response = await fetch('/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({ question: this.chatQuestion })
+                        });
+                        
+                        const data = await response.json();
+                        
+                        if (data.success) {
+                            this.chatAnswer = data.answer;
+                        } else {
+                            this.chatAnswer = 'Error: ' + (data.error || 'Failed to generate answer');
+                        }
+                    } catch (error) {
+                        this.chatAnswer = 'Network error: ' + error.message;
+                    } finally {
+                        this.generating = false;
+                    }
+                },
+
+                async checkStatus() {
+                    try {
+                        const response = await fetch('/status');
+                        const data = await response.json();
+                        this.hasData = data.has_data;
+                        if (data.has_data) {
+                            this.contentInfo = data.content_info;
+                        }
+                    } catch (error) {
+                        console.error('Failed to check status:', error);
+                    }
+                },
+
+                init() {
+                    this.checkStatus();
+                }
+            }
+        }
+    </script>
+</body>
+</html>
