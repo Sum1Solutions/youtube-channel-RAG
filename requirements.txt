@@ -10,7 +10,7 @@ chromadb==0.4.15
 sentence-transformers>=2.3.0
 
 # Text Processing
-langchain==0.0.317
+langchain==0.2.5
 beautifulsoup4==4.12.2
 lxml==4.9.3
 
