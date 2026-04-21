@@ -12,7 +12,7 @@ sentence-transformers>=2.3.0
 # Text Processing
 langchain==0.0.317
 beautifulsoup4==4.12.2
-lxml==4.9.3
+lxml==6.1.0
 
 # Data Processing
 numpy==1.24.3
