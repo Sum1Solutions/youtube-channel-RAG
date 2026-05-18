@@ -3,7 +3,7 @@ flask==2.3.3
 youtube-transcript-api==0.6.1
 yt-dlp==2023.9.24
 requests==2.31.0
-python-dotenv==1.0.0
+python-dotenv==1.2.2
 
 # RAG and Vector Storage
 chromadb==0.4.15
